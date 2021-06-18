@@ -50,6 +50,8 @@ namespace nTupleAnalysis {
     //void dump();
   };
 
+  typedef std::shared_ptr<dijet> dijetPtr;
+
 }
 #endif // dijet_H
 
