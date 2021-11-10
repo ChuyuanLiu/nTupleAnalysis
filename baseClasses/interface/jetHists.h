@@ -7,6 +7,7 @@
 #include "PhysicsTools/FWLite/interface/TFileService.h"
 #include "nTupleAnalysis/baseClasses/interface/jetData.h"
 #include "nTupleAnalysis/baseClasses/interface/fourVectorHists.h"
+#include "nTupleAnalysis/baseClasses/interface/jetDeltaHists.h"
 #include "nTupleAnalysis/baseClasses/interface/trackHists.h"
 #include "nTupleAnalysis/baseClasses/interface/btaggingHists.h"
 
@@ -34,12 +35,10 @@ namespace nTupleAnalysis {
     TH1F*   deepCSVb_l    ;
     TH1F*   deepCSVbb_l    ;
 
-    TH1F*   SoftMu     ;
     TH1F*   nSoftMu        ;
     TH1F*   pt_wo_bRegCorr;
     TH1F*   bRegCorr;
 
-    TH1F*   SoftEl     ;
     TH1F*   nSoftEl        ;
 
     TH1F* flavour       ;
@@ -50,12 +49,31 @@ namespace nTupleAnalysis {
     TH1F* ncHadrons     ;
     TH1F* SF     ;
 
-    TH1F* matched_dPt      = NULL;
-    TH1F* matched_dEta     ;
-    TH1F* matched_dPhi     ;
-    TH1F* matched_dR       ;
-    TH1F* matched_dcsv     ;
-    TH1F* matched_dDeepcsv ;
+    jetDeltaHists* hMatchedJet = NULL;
+
+    TH1F* Ip2N     = NULL;
+    TH1F* Ip2P     = NULL;
+    TH1F* Ip3N     = NULL;
+    TH1F* Ip3P     = NULL;
+    TH1F* Ip2N_l     = NULL;
+    TH1F* Ip2P_l     = NULL;
+    TH1F* Ip3N_l     = NULL;
+    TH1F* Ip3P_l     = NULL;
+    TH1F* ProbaN   = NULL;
+    TH1F* Proba    = NULL;
+    TH1F* BprobN   = NULL;
+    TH1F* Bprob    = NULL;
+    TH1F* Svx      = NULL;
+    TH1F* SvxHP    = NULL;
+    TH1F* CombIVF  = NULL;
+    TH1F* CombIVF_N= NULL;
+    TH1F* SoftMuN  = NULL;
+    TH1F* SoftMu   = NULL;
+    TH1F* SoftElN  = NULL;
+    TH1F* SoftEl   = NULL;
+    TH1F* cMVAv2   = NULL;
+    TH1F* cMVAv2N  = NULL;
+
 
     TH1F* matched_dRAll    = NULL ;
     TH1F* matched_dRBjet   = NULL ;
@@ -65,6 +83,8 @@ namespace nTupleAnalysis {
 
     trackHists* tracks = NULL;
     trackHists* tracks_noV0 = NULL;
+    trackHists* tracks_innerPixHit = NULL;
+    trackHists* tracks_noInnerPixHit = NULL;
 
     btaggingHists* btags = NULL;
     btaggingHists* btags_noV0 = NULL;
@@ -73,6 +93,14 @@ namespace nTupleAnalysis {
     TH1F* Delta_nTracks_tracks_btag_noV0 = NULL;
     TH1F* Delta_nTracks_tracks_btag_l = NULL;
     TH1F* Delta_nTracks_tracks_btag_noV0_l = NULL;
+
+    std::vector<float> deepFlavB_ptBins = {50,100,300,10000};
+    std::vector<TH1F*> deepFlavB_ptHists;
+    std::vector<TH1F*> Proba_ptHists;
+
+    std::vector<float> deepFlavB_etaBins = {0.5,1,1.5,2,2.5};
+    std::vector<TH1F*> deepFlavB_etaHists;
+    std::vector<TH1F*> Proba_etaHists;
 
     std::string name;
     std::string title;
