@@ -9,7 +9,9 @@
 #include "nTupleAnalysis/baseClasses/interface/btaggingData.h"
 
 #include "CondTools/BTau/interface/BTagCalibrationReader.h"
-
+#if CORRECTIONLIB == 1
+#include "correction.h"
+#endif
 
 namespace nTupleAnalysis {
 
@@ -77,6 +79,7 @@ namespace nTupleAnalysis {
     float DeepCSVbb    = 0;
 
     // truth Info
+    int genJetIdx      ;
     int flavour        ;
     int flavourCleaned ;
     int partonFlavour  ;
@@ -218,7 +221,12 @@ namespace nTupleAnalysis {
     float DeepCSVbb    [MAXJETS] = {0};
 
     //
+    UInt_t nGenJets = 0;
+    UChar_t GenJet_hadronFlavour  [MAXJETS];
+    Int_t   GenJet_partonFlavour  [MAXJETS];
+
     bool m_loadGenJets =  false; 
+    bool  hasGenJetHasMatch = false;
     int   GenJet_hasMatch [MAXJETS];
     float GenJet_pt       [MAXJETS];
     float GenJet_eta      [MAXJETS];
@@ -238,6 +246,8 @@ namespace nTupleAnalysis {
 
 
     // truth Info
+    bool hasGenJetIdx = false   ;
+    int genJetIdx      [MAXJETS];
     int flavour        [MAXJETS];
     int flavourCleaned [MAXJETS];
     int partonFlavour  [MAXJETS];
@@ -263,7 +273,8 @@ namespace nTupleAnalysis {
 
 
     jetData(std::string, TTree*, bool readIn = true, bool isMC = false, std::string jetDetailLevel = "Tracks.btagInputs", std::string prefix = "", std::string SFName = "", std::string btagVariations = "central",
-	    std::string JECSyst = "", std::string tagger = ""); 
+	    std::string JECSyst = "", std::string tagger = "",
+      std::string era = "", std::string puIdVariations = ""); 
 
     std::vector< jetPtr > getJets(float ptMin = -1e6, float ptMax = 1e6, float etaMax = 1e6, bool clean = false, float tagMin = -1e6, std::string tagger = "CSVv2", bool antiTag = false, int puIdMin = 0);
     std::vector< jetPtr > getJets(std::vector< jetPtr > inputJets, 
@@ -274,10 +285,18 @@ namespace nTupleAnalysis {
     std::vector<std::string> m_btagVariations;
     std::map<std::string, BTagCalibrationReader*> m_btagCalibrationTools;
     std::map<std::string,float> m_btagSFs;
-    float getSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, std::string variation = "central");
+    std::vector<std::string> m_puIdVariations;
+    std::map<std::string,float> m_puIdSFs;
+
+    #if CORRECTIONLIB == 1
+    std::unique_ptr<correction::CorrectionSet> jmarCSet = nullptr;
+    float getPuIdSF(float jetEta, float jetPt, bool matched, int puId, int puIdWP, std::string variation = "nom", int jetHadronFlavour = 0);
+    #endif
+    
+    float getBTagSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, std::string variation = "central");
     void updateSFs(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, bool debug = false );
-    void updateSFs(const jetPtr& jet, bool debug = false );
-    void updateSFs(std::vector< jetPtr > jets, bool debug = false );
+    void updateSFs(const jetPtr& jet, bool debug = false, int puIdWP = 0);
+    void updateSFs(std::vector< jetPtr > jets, bool debug = false, int puIdWP = 0);
     void resetSFs();
 
     void writeJets(std::vector< jetPtr > outputJets) ;

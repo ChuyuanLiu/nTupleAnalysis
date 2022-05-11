@@ -39,6 +39,9 @@ namespace nTupleAnalysis {
     TH1F*   pt_wo_bRegCorr;
     TH1F*   bRegCorr;
 
+    TH1F* ptGenDiff;
+    TH1F* mGenDiff;
+
     TH1F*   nSoftEl        ;
 
     TH1F* flavour       ;

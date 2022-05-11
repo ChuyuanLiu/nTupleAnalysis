@@ -9,3 +9,5 @@
 <export>
   <lib name="nTupleAnalysisbaseClasses"/>
 </export>
+<Flags CPPDEFINES="CORRECTIONLIB=0"/>
+<use   name="correctionlib"/>

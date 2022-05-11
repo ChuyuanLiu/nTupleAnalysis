@@ -8,7 +8,7 @@ jetHists::jetHists(std::string _name, fwlite::TFileService& fs, std::string _tit
     name  = _name;
     title = _title;
     dir = fs.mkdir(name);
-    v = new fourVectorHists(name, dir, title);
+    v = new fourVectorHists(name, dir, title);  
 
     cleanmask = dir.make<TH1F>("cleanmask", (name+"/cleanmask; "+title+" Clean Mask; Entries").c_str(), 2,-0.5,1.5);
     puId = dir.make<TH1F>("puId", (name+"/puId; "+title+" Pileup ID; Entries").c_str(), 17,-0.5,16.5);
@@ -31,6 +31,8 @@ jetHists::jetHists(std::string _name, fwlite::TFileService& fs, std::string _tit
     bRegCorr       = dir.make<TH1F>("bRegCorr", (name+"/bRegCorr; "+title+" bRegCorr; Entries").c_str(),  100,0,2 );
     hadronFlavour     = dir.make<TH1F>("hadronFlavour",     (name+"/hadronFlavour;    " +title+" Hadron Flavour; Entries").c_str(),  31,-5.5,25.5);
 
+    ptGenDiff = dir.make<TH1F>("ptGenDiff",     (name+"/ptGenDiff;    " +title+" p_T RECO-GEN [GeV]; Entries").c_str(),  100,-50,50);
+    mGenDiff = dir.make<TH1F>("mGenDiff",     (name+"/mGenDiff;    " +title+" m RECO-GEN [GeV]; Entries").c_str(),  40,-20,20);
     
     if(jetDetailLevel.find("matchedJet") != std::string::npos){
       hMatchedJet = new jetDeltaHists(name+"/matchedJet", fs, title);
@@ -163,6 +165,9 @@ void jetHists::Fill(const std::shared_ptr<jet> &jet, float weight){
 
   pt_wo_bRegCorr ->Fill(jet->pt_wo_bRegCorr, weight);
   bRegCorr ->Fill(jet->bRegCorr, weight);
+
+  ptGenDiff ->Fill(jet->p.Pt()-jet->genJet_p.Pt(), weight);
+  mGenDiff ->Fill(jet->p.M()-jet->genJet_p.M(), weight);
 
   hadronFlavour    ->Fill(jet->hadronFlavour,   weight);
 

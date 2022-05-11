@@ -86,7 +86,7 @@ jet::jet(UInt_t i, jetData* data, std::string tagger){
   if(DeepCSVbb < 0)
     DeepCSVbb = -0.1;
 
-
+  genJetIdx      = data->genJetIdx      [i];
   flavour        = data->flavour        [i];
   flavourCleaned = data->flavourCleaned [i];
   partonFlavour  = data->partonFlavour  [i];
@@ -211,24 +211,36 @@ jet::jet(UInt_t i, jetData* data, std::string tagger){
 
   if(data->m_loadGenJets){
     genJet_p = TLorentzVector();    
-    genJet_p.SetPtEtaPhiM(data->GenJet_pt[i],
-			  data->GenJet_eta[i],
-			  data->GenJet_phi[i],
-			  data->GenJet_m[i]);
-    //cout << "is B is " << data->isB[i] << endl;
-    if(data->isB[i] || data->isBB[i] || data->isGBB[i] ){
-      //cout << " pass  " << data->isB[i] << endl;
-      flavour        = 5;
-    }else if(data->isC[i] || data->isCC[i] || data->isGCC[i] ){
-      flavour        = 4;
+    if(data->hasGenJetHasMatch){
+      genJet_p.SetPtEtaPhiM(data->GenJet_pt[i],
+          data->GenJet_eta[i],
+          data->GenJet_phi[i],
+          data->GenJet_m[i]);
+      //cout << "is B is " << data->isB[i] << endl;
+      if(data->isB[i] || data->isBB[i] || data->isGBB[i] ){
+        //cout << " pass  " << data->isB[i] << endl;
+        flavour        = 5;
+      }else if(data->isC[i] || data->isCC[i] || data->isGCC[i] ){
+        flavour        = 4;
+      }else{
+        flavour        = 0;
+      }
     }else{
-      flavour        = 0;
+      auto idx = data->genJetIdx[i];
+      if(idx >= 0){
+        genJet_p.SetPtEtaPhiM(data->GenJet_pt[idx],
+            data->GenJet_eta[idx],
+            data->GenJet_phi[idx],
+            data->GenJet_m[idx]);
+        flavour = data->GenJet_partonFlavour[idx];
+      }
     }
+
     
   }
 
   if(data->m_isMC && data->m_btagCalibrationTool){
-    SF = data->getSF(eta, pt, DeepCSV, hadronFlavour);
+    SF = data->getBTagSF(eta, pt, DeepCSV, hadronFlavour);
   }else{
     SF = 1.0;
   }
@@ -330,10 +342,18 @@ void jet::dump(){
 jet::~jet(){
 }
 
+std::vector<std::string> split(std::string str){
+  std::stringstream ss(str);
+  std::istream_iterator<std::string> begin(ss);
+  std::istream_iterator<std::string> end;
+  return std::vector<std::string>(begin,end);
+}
+
+
 //
 //access tree
 //
-jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::string jetDetailLevel, std::string prefix, std::string SFName, std::string btagVariations, std::string JECSyst, std::string tagger){
+jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::string jetDetailLevel, std::string prefix, std::string SFName, std::string btagVariations, std::string JECSyst, std::string tagger, std::string era, std::string puIdVariations){
 
   m_name = name;
   m_prefix = prefix;
@@ -350,10 +370,8 @@ jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::str
 
 
   // Split btagVariations at spaces into vector of variation names
-  std::stringstream ss(btagVariations);
-  std::istream_iterator<std::string> begin(ss);
-  std::istream_iterator<std::string> end;
-  m_btagVariations = std::vector<std::string>(begin,end);
+  m_btagVariations = split(btagVariations);
+  m_puIdVariations = split(puIdVariations);
 
   //
   // Load the BTagging SFs
@@ -418,6 +436,24 @@ jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::str
 
   }
 
+  #if CORRECTIONLIB == 1
+  if(readIn && m_isMC && m_puIdVariations.size()>0){
+    std::string jmarSfFileName = "";
+    if(era == "2016_preVFP"){
+      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2016_preVFP/UL16preVFP_jmar.json";
+    }else if(era == "2016_postVFP"){
+      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2016_postVFP/UL16postVFP_jmar.json";
+    }else if(era == "2017"){
+      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2017/UL17_jmar.json";
+    }else if(era == "2018"){
+      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2018/UL18_jmar.json";
+    }
+    if(jmarSfFileName != ""){
+      std::cout << "Load PUJetID SF from " << jmarSfFileName << std::endl;
+      jmarCSet = correction::CorrectionSet::from_file(jmarSfFileName);
+    }
+  }
+  #endif
 }
 
 
@@ -425,7 +461,27 @@ jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::str
 
 
 std::vector< jetPtr > jetData::getJets(float ptMin, float ptMax, float etaMax, bool clean, float tagMin, std::string tagger, bool antiTag, int puIdMin){
-  
+
+  if(nGenJets > 0 && m_isMC && !hasGenJetIdx && (m_jetDetailLevel.find("GenJet") != std::string::npos)){
+    std::vector<bool> genMatched(nGenJets, false);
+    for(UInt_t iJet = 0; iJet < nJets; ++iJet){
+      auto iJet_p = TLorentzVector();
+      genJetIdx[iJet] = -1;
+      iJet_p.SetPtEtaPhiM(pt[iJet], eta[iJet], phi[iJet], m[iJet]);
+      for(UInt_t iGenJet = 0; iGenJet < nGenJets; ++ iGenJet){
+        if(!genMatched[iGenJet]){
+          auto iGenJet_p = TLorentzVector();
+          iGenJet_p.SetPtEtaPhiM(GenJet_pt[iGenJet], GenJet_eta[iGenJet], GenJet_phi[iGenJet], GenJet_m[iGenJet]);
+          if(iGenJet_p.DeltaR(iJet_p) < 0.4){
+            genJetIdx[iJet] = iGenJet;
+            genMatched[iGenJet] = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   std::vector< jetPtr > outputJets;
 
   float *tag = bTagScore;
@@ -527,8 +583,7 @@ jetData::~jetData(){
   std::cout << "jetData::destroyed " << std::endl;
 }
 
-
-float jetData::getSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, std::string variation){ 
+float jetData::getBTagSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, std::string variation){ 
   if(m_btagCalibrationTools.empty()) 
     return 1;
   
@@ -541,36 +596,62 @@ float jetData::getSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadr
   return m_btagCalibrationTools[variation]->eval_auto_bounds(variation, BTagEntry::FLAV_UDSG, fabs(jetEta), jetPt, jetTagScore);
 }
 
+#if CORRECTIONLIB == 1
+std::string getPuIdWPName(int puIdWP){
+  switch (puIdWP)
+  {
+    case 0b100: return "L";
+    case 0b110: return "M";
+    case 0b111: return "T";
+  }
+  return "";
+}
+
+float jetData::getPuIdSF(float jetEta, float jetPt, bool jetMatched, int jetPuId, int puIdWP, std::string variation, int jetHadronFlavour){
+  if(jetPt < 50 && jetMatched && jetPuId >= puIdWP && puIdWP > 0 && fabs(jetHadronFlavour) != 5){
+    return jmarCSet->at("PUJetID_eff")->evaluate({jetEta, jetPt, variation, getPuIdWPName(puIdWP)});
+  }
+  return 1;
+}
+#endif
 
 void jetData::updateSFs(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour,bool debug){
   for(auto &variation: m_btagVariations){
     if(debug)
       cout << "jetPt/jetEta/jetTagScore/jetHadronFlavour/SF" 
-	   << jetPt << "/" << jetEta << "/" << jetTagScore << "/" << jetHadronFlavour << "/" << getSF(jetEta, jetPt, jetTagScore, jetHadronFlavour, variation) << endl;
+	   << jetPt << "/" << jetEta << "/" << jetTagScore << "/" << jetHadronFlavour << "/" << getBTagSF(jetEta, jetPt, jetTagScore, jetHadronFlavour, variation) << endl;
       
-    m_btagSFs[variation] *= getSF(jetEta, jetPt, jetTagScore, jetHadronFlavour, variation);
+    m_btagSFs[variation] *= getBTagSF(jetEta, jetPt, jetTagScore, jetHadronFlavour, variation);
   }
 }
 
-void jetData::updateSFs(const jetPtr& jet, bool debug){
+void jetData::updateSFs(const jetPtr& jet, bool debug, int puIdWP){
   for(auto &variation: m_btagVariations){
     if(debug)
       cout << "jetPt/jetEta/jetTagScore/jetHadronFlavour/SF" 
-	   << jet->pt << "/" << jet->eta << "/" << jet->bTagScore << "/" << jet->hadronFlavour << "/" << getSF(jet->eta, jet->pt, jet->bTagScore, jet->hadronFlavour, variation) << endl;
+	   << jet->pt << "/" << jet->eta << "/" << jet->bTagScore << "/" << jet->hadronFlavour << "/" << getBTagSF(jet->eta, jet->pt, jet->bTagScore, jet->hadronFlavour, variation) << endl;
       
-    m_btagSFs[variation] *= getSF(jet->eta, jet->pt, jet->bTagScore, jet->hadronFlavour, variation);
+    m_btagSFs[variation] *= getBTagSF(jet->eta, jet->pt, jet->bTagScore, jet->hadronFlavour, variation);
   }
+  #if CORRECTIONLIB == 1
+  for(auto &variation: m_puIdVariations){
+    m_puIdSFs[variation] *= getPuIdSF(jet->eta, jet->pt, jet->genJet_p.E() > 0, jet->puId, puIdWP, variation, jet->hadronFlavour);
+  }
+  #endif
 }
 
-void jetData::updateSFs(std::vector< jetPtr > jets, bool debug){
-  for(auto &jet: jets) updateSFs(jet, debug);
+void jetData::updateSFs(std::vector< jetPtr > jets, bool debug, int puIdWP){
+  for(auto &jet: jets) updateSFs(jet, debug, puIdWP);
 }
 
 
 void jetData::resetSFs(){
   for(auto &variation: m_btagVariations){
     m_btagSFs[variation] = 1;
-  }  
+  }
+  for(auto &variation: m_puIdVariations){
+    m_puIdSFs[variation] = 1;
+  }
 }
 
 
@@ -620,6 +701,7 @@ void jetData::writeJets(std::vector< jetPtr > outputJets){
     this->DeepCSVl       [i] =      thisJet->DeepCSVl       ;
     this->DeepCSVbb      [i] =      thisJet->DeepCSVbb      ;
     
+    this->genJetIdx      [i] =     thisJet->genJetIdx      ;
     this->flavour        [i] =     thisJet->flavour        ;
     this->flavourCleaned [i] =     thisJet->flavourCleaned ;
     this->partonFlavour  [i] =     thisJet->partonFlavour  ;
@@ -676,6 +758,7 @@ void jetData::connectBranches(bool readIn, TTree* tree, std::string JECSyst){
   connectBranchArr(readIn, tree, jetName+"_jetId", jetId,   NjetName,  "I");  
 
   if(m_isMC){
+    hasGenJetIdx = (connectBranchArr(readIn, tree, jetName+"_genJetIdx", genJetIdx,   NjetName,  "I") == 0);
     connectBranchArr(readIn, tree, jetName+"_flavour", flavour,   NjetName,  "I");  
     connectBranchArr(readIn, tree, jetName+"_flavourCleaned", flavourCleaned,   NjetName,  "I");  
     connectBranchArr(readIn, tree, jetName+"_partonFlavour", partonFlavour,   NjetName,  "I");  
@@ -765,11 +848,22 @@ void jetData::connectBranches(bool readIn, TTree* tree, std::string JECSyst){
 
     if(m_jetDetailLevel.find("GenJet") != std::string::npos){
       m_loadGenJets = true;
-      connectBranchArr(readIn, tree, jetName+"_GenJetHasMatch"  , GenJet_hasMatch,  NjetName,  "I");
-      connectBranchArr(readIn, tree, jetName+"_GenJet_pt"  , GenJet_pt,  NjetName,  "F");
-      connectBranchArr(readIn, tree, jetName+"_GenJet_eta",  GenJet_eta, NjetName,  "F");
-      connectBranchArr(readIn, tree, jetName+"_GenJet_phi",  GenJet_phi, NjetName,  "F");
-      connectBranchArr(readIn, tree, jetName+"_GenJet_mass", GenJet_m,   NjetName,  "F");  
+      hasGenJetHasMatch = (connectBranchArr(readIn, tree, jetName+"_GenJetHasMatch"  , GenJet_hasMatch,  NjetName,  "I") == 0);
+      if(hasGenJetHasMatch){
+        connectBranchArr(readIn, tree, jetName+"_GenJet_pt"  , GenJet_pt,  NjetName,  "F");
+        connectBranchArr(readIn, tree, jetName+"_GenJet_eta",  GenJet_eta, NjetName,  "F");
+        connectBranchArr(readIn, tree, jetName+"_GenJet_phi",  GenJet_phi, NjetName,  "F");
+        connectBranchArr(readIn, tree, jetName+"_GenJet_mass", GenJet_m,   NjetName,  "F");  
+      }else{
+        connectBranch(readIn, tree, "nGenJet", nGenJets, "i");
+        connectBranchArr(readIn, tree, "GenJet_pt"  , GenJet_pt,  "nGenJet",  "F");
+        connectBranchArr(readIn, tree, "GenJet_eta",  GenJet_eta, "nGenJet",  "F");
+        connectBranchArr(readIn, tree, "GenJet_phi",  GenJet_phi, "nGenJet",  "F");
+        connectBranchArr(readIn, tree, "GenJet_mass", GenJet_m,   "nGenJet",  "F");  
+        connectBranchArr(readIn, tree, "GenJet_hadronFlavour", GenJet_hadronFlavour,   "nGenJet",  "b");  
+        connectBranchArr(readIn, tree, "GenJet_partonFlavour", GenJet_partonFlavour,   "nGenJet",  "I"); 
+      }
+
 
       connectBranchArr(readIn, tree, jetName+"_isB"         , isB        , NjetName, "I");
       connectBranchArr(readIn, tree, jetName+"_isGBB"	, isGBB      , NjetName, "I");
