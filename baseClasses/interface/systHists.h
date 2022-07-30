@@ -14,9 +14,9 @@ namespace nTupleAnalysis {
     
     std::map <std::string, TH1F*> hists;
 
-    systHists(TH1F*, std::vector<std::string>&);
+    systHists(TH1F*, std::vector<std::string>&, std::string tag = "");
 
-    void makeHists(TH1F*, std::vector<std::string>&);
+    void makeHists(TH1F*, std::vector<std::string>&, std::string);
     void Fill(float, float, std::map<std::string, float>&, float denom = 1);
 
     ~systHists(); 

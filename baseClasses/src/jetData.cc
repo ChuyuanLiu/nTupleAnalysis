@@ -4,8 +4,6 @@
 
 #include "nTupleAnalysis/baseClasses/interface/jetData.h"
 #include "DataFormats/BTauReco/interface/ParticleMasses.h"
-#include "CondFormats/BTauObjects/interface/BTagEntry.h"
-#include "CondFormats/BTauObjects/interface/BTagCalibration.h"
 
 using namespace nTupleAnalysis;
 using std::cout;  using std::endl;
@@ -239,7 +237,7 @@ jet::jet(UInt_t i, jetData* data, std::string tagger){
     
   }
 
-  if(data->m_isMC && data->m_btagCalibrationTool){
+  if(data->m_isMC && data->btagCSet){
     SF = data->getBTagSF(eta, pt, DeepCSV, hadronFlavour);
   }else{
     SF = 1.0;
@@ -353,7 +351,7 @@ std::vector<std::string> split(std::string str){
 //
 //access tree
 //
-jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::string jetDetailLevel, std::string prefix, std::string SFName, std::string btagVariations, std::string JECSyst, std::string tagger, std::string era, std::string puIdVariations){
+jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::string jetDetailLevel, std::string prefix, std::string SFName, std::string btagVariations, std::string JECSyst, std::string tagger, std::string year, std::string puIdVariations){
 
   m_name = name;
   m_prefix = prefix;
@@ -374,96 +372,24 @@ jetData::jetData(std::string name, TTree* tree, bool readIn, bool isMC, std::str
   m_puIdVariations = split(puIdVariations);
 
   //
-  // Load the BTagging SFs
+  // Load SFs
   //
-  if(readIn && m_isMC && SFName != ""){
 
-    if(SFName != "2017" && SFName != "deepcsv2018" && SFName != "deepjet2018" && SFName != "deepjet2017" && SFName != "deepjet2016" && SFName != "deepjet2016_preVFP" && SFName != "deepjet2016_postVFP"){
-      std::cout << "jetData::Warning no scale factors for " << m_name << " and SFName " << SFName << std::endl;
-    }else{
-
-      std::string systTag = "_noSyst";
-      if(m_btagVariations.size()>1){
-	systTag = "";
-	std::cout << "Loading b-tag systematic variations. Will take several miniutes and use a few hundred MB of RAM." << std::endl;	
-      }else{
-	std::cout << "Not loading b-tag systematic variations" << std::endl;
-      }
-      
-      std::string sfFileName =  "nTupleAnalysis/baseClasses/data/BTagSF2017/DeepCSV_94XSF_V4_B_F"+systTag+".csv";
-      if(SFName == "deepcsv2018")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2018/DeepCSV_102XSF_V1"+systTag+".csv";
-      if(SFName == "deepjet2018")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2018/reshaping_deepJet_106XUL18_v2"+systTag+".csv";
-	// sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2018/DeepJet_106XUL18SF"+systTag+".csv";
-        // sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2018/DeepJet_102XSF_V1"+systTag+".csv";
-      if(SFName == "deepjet2017")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2017/reshaping_deepJet_106XUL17_v3"+systTag+".csv";
-	// sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2017/DeepJet_106XUL17SF_V2"+systTag+".csv";
-        // sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2017/DeepFlavour_94XSF_V3_B_F"+systTag+".csv";
-      if(SFName == "deepjet2016")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2016/DeepJet_2016LegacySF_V1"+systTag+".csv";
-      if(SFName == "deepjet2016_preVFP")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2016/reshaping_deepJet_106XUL16preVFP_v2"+systTag+".csv";
-      if(SFName == "deepjet2016_postVFP")
-	sfFileName = "nTupleAnalysis/baseClasses/data/BTagSF2016/reshaping_deepJet_106XUL16postVFP_v3"+systTag+".csv";
-      
-      std::cout << "jetData::Loading SF from " << sfFileName << " For jets " << m_name << std::endl;
-      BTagCalibration calib = BTagCalibration("", sfFileName);//tagger name only needed for creating csv files
-
-
-      for(auto &variation: m_btagVariations){
-	std::cout<<"Load btag systematic variation: "<<variation<<std::endl;
-
-	m_btagCalibrationTools[variation] = new BTagCalibrationReader(BTagEntry::OP_RESHAPING, // 0 is for loose op, 1: medium, 2: tight, 3: discr. reshaping
-								      variation // systematic type
-								      );
-
-	std::cout << "jetData::Load BTagEntry::FLAV_B" << std::endl;
-	m_btagCalibrationTools[variation]->load(calib, 
-						BTagEntry::FLAV_B,   // 0 is for b flavour, 1: FLAV_C, 2: FLAV_UDSG
-						"iterativefit"      // measurement type
-						);
-	
-	std::cout << "jetData::Load BTagEntry::FLAV_C" << std::endl;
-	m_btagCalibrationTools[variation]->load(calib, 
-					       BTagEntry::FLAV_C,   // 0 is for b flavour, 1: FLAV_C, 2: FLAV_UDSG
-					       "iterativefit"      // measurement type
-					       );
-
-	std::cout << "jetData::Load BTagEntry::FLAV_UDSG" << std::endl;
-	m_btagCalibrationTools[variation]->load(calib, 
-						BTagEntry::FLAV_UDSG,   // 0 is for b flavour, 1: FLAV_C, 2: FLAV_UDSG
-						"iterativefit"      // measurement type
-						);
-      }
-
-    }
-
+  btagSFName = SFName + "_shape";
+  std::string jsonPath = "nTupleAnalysis/baseClasses/data/json/UL" + year;
+  // btagging
+  if(readIn && m_isMC && m_btagVariations.size()>0 && SFName != ""){
+    std::string sfFilePath = jsonPath + "_btagging.json";
+    btagCSet = correction::CorrectionSet::from_file(sfFilePath);
+    std::cout << "Load btagging SF from " << sfFilePath << std::endl;
   }
-
-  #if CORRECTIONLIB == 1
+  // PU Jet ID
   if(readIn && m_isMC && m_puIdVariations.size()>0){
-    std::string jmarSfFileName = "";
-    if(era == "2016_preVFP"){
-      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2016_preVFP/UL16preVFP_jmar.json";
-    }else if(era == "2016_postVFP"){
-      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2016_postVFP/UL16postVFP_jmar.json";
-    }else if(era == "2017"){
-      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2017/UL17_jmar.json";
-    }else if(era == "2018"){
-      jmarSfFileName = "nTupleAnalysis/baseClasses/data/PUJetIDSF2018/UL18_jmar.json";
-    }
-    if(jmarSfFileName != ""){
-      std::cout << "Load PUJetID SF from " << jmarSfFileName << std::endl;
-      jmarCSet = correction::CorrectionSet::from_file(jmarSfFileName);
-    }
+    std::string sfFilePath = jsonPath + "_jmar.json";
+    jmarCSet = correction::CorrectionSet::from_file(sfFilePath);
+    std::cout << "Load PUJetID SF from " << sfFilePath << std::endl;
   }
-  #endif
 }
-
-
-
 
 
 std::vector< jetPtr > jetData::getJets(float ptMin, float ptMax, float etaMax, bool clean, float tagMin, std::string tagger, bool antiTag, int puIdMin){
@@ -590,19 +516,18 @@ jetData::~jetData(){
 }
 
 float jetData::getBTagSF(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour, std::string variation){ 
-  if(m_btagCalibrationTools.empty()) 
+  if(btagCSet == nullptr || fabs(jetEta) >= 2.5) 
     return 1;
+
+  bool isCferr = variation.find("cferr") != std::string::npos;
+  jetHadronFlavour = fabs(jetHadronFlavour);
   
-  if(fabs(jetHadronFlavour) == 5)
-    return m_btagCalibrationTools[variation]->eval_auto_bounds(variation, BTagEntry::FLAV_B, fabs(jetEta), jetPt, jetTagScore);
-  
-  if(fabs(jetHadronFlavour) == 4)
-    return m_btagCalibrationTools[variation]->eval_auto_bounds(variation, BTagEntry::FLAV_C, fabs(jetEta), jetPt, jetTagScore);
-  
-  return m_btagCalibrationTools[variation]->eval_auto_bounds(variation, BTagEntry::FLAV_UDSG, fabs(jetEta), jetPt, jetTagScore);
+  if((isCferr && jetHadronFlavour != 4) || (!isCferr && jetHadronFlavour == 4)){
+    variation = "central";
+  }
+  return btagCSet->at(btagSFName)->evaluate({variation, jetHadronFlavour, fabs(jetEta), jetPt, jetTagScore});
 }
 
-#if CORRECTIONLIB == 1
 std::string getPuIdWPName(int puIdWP){
   switch (puIdWP)
   {
@@ -614,12 +539,11 @@ std::string getPuIdWPName(int puIdWP){
 }
 
 float jetData::getPuIdSF(float jetEta, float jetPt, bool jetMatched, int jetPuId, int puIdWP, std::string variation, int jetHadronFlavour){
-  if(jetPt < 50 && jetMatched && jetPuId >= puIdWP && puIdWP > 0 && fabs(jetHadronFlavour) != 5){
+  if(jetPt < 50 && jetMatched && jetPuId >= puIdWP && puIdWP > 0 && jmarCSet != nullptr){
     return jmarCSet->at("PUJetID_eff")->evaluate({jetEta, jetPt, variation, getPuIdWPName(puIdWP)});
   }
   return 1;
 }
-#endif
 
 void jetData::updateSFs(float jetEta,  float jetPt,  float jetTagScore, int jetHadronFlavour,bool debug){
   for(auto &variation: m_btagVariations){
@@ -639,11 +563,9 @@ void jetData::updateSFs(const jetPtr& jet, bool debug, int puIdWP){
       
     m_btagSFs[variation] *= getBTagSF(jet->eta, jet->pt, jet->bTagScore, jet->hadronFlavour, variation);
   }
-  #if CORRECTIONLIB == 1
   for(auto &variation: m_puIdVariations){
     m_puIdSFs[variation] *= getPuIdSF(jet->eta, jet->pt, jet->genJet_p.E() > 0, jet->puId, puIdWP, variation, jet->hadronFlavour);
   }
-  #endif
 }
 
 void jetData::updateSFs(std::vector< jetPtr > jets, bool debug, int puIdWP){

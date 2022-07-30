@@ -1,4 +1,5 @@
 <Flags CPPDEFINES="SLC6=0"/>
+<use   name="json"/>
 <use   name="boost"/>
 <use   name="rootcore"/>
 <use   name="roothistmatrix"/>
@@ -9,5 +10,5 @@
 <export>
   <lib name="nTupleAnalysisbaseClasses"/>
 </export>
-<Flags CPPDEFINES="CORRECTIONLIB=0"/>
+<Flags CPPDEFINES="CORRECTIONLIB=1"/>
 <use   name="correctionlib"/>

@@ -7,14 +7,14 @@ using namespace nTupleAnalysis;
 //   this->makeHists(name, dir, title);
 // }
 
-systHists::systHists(TH1F* nominal, std::vector<std::string>& variations) {
-  this->makeHists(nominal, variations);
+systHists::systHists(TH1F* nominal, std::vector<std::string>& variations, std::string tag) {
+  this->makeHists(nominal, variations, tag);
 }
 
-void systHists::makeHists(TH1F* nominal, std::vector<std::string>& variations) {
+void systHists::makeHists(TH1F* nominal, std::vector<std::string>& variations, std::string tag) {
 
   for(auto &variation: variations){
-    hists[variation] = (TH1F*) nominal->Clone((std::string(nominal->GetName())+"_"+variation).c_str());
+    hists[variation] = (TH1F*) nominal->Clone((std::string(nominal->GetName())+"_"+variation+(tag == "" ? "" : "_")+tag).c_str());
   }
 
   return;
